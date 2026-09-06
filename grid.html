@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Batch Grid — Product Pack Grabber</title>
+<link rel="stylesheet" href="ppg-fx.css">
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, sans-serif; margin: 0; padding: 20px 24px; background: #f7f5fb; color: #1a1a1a; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  .sub { font-size: 12px; color: #888; margin-bottom: 14px; }
+
+  #inputPanel { background: #fff; border: 1px solid #eee; border-radius: 10px; padding: 14px; margin-bottom: 14px; }
+  #scriptInput { width: 100%; min-height: 120px; font-size: 12.5px; padding: 8px; border: 1px solid #ddd; border-radius: 8px; resize: vertical; font-family: inherit; }
+  .input-row { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
+  #parseBtn { background: linear-gradient(135deg,#8b3ff5,#6b21d8); color:#fff; border:none; border-radius:8px; padding:9px 18px; font-size:13px; cursor:pointer; }
+  #parseBtn:disabled { opacity: .6; cursor: default; }
+  #parseStatus { font-size: 12px; color: #888; }
+
+  #timerBar { display: flex; align-items: center; gap: 14px; background: #fff; border: 1px solid #eee; border-radius: 10px; padding: 10px 14px; margin-bottom: 14px; font-size: 13px; }
+  #timerDisplay { font-variant-numeric: tabular-nums; font-weight: 700; color: #6b21d8; font-size: 15px; }
+  #timerBar button { font-size: 12px; border: none; border-radius: 6px; padding: 6px 12px; cursor: pointer; background: #f2eafc; color: #6b21d8; }
+  #scriptsDoneCount { font-weight: 700; color: #22a745; }
+
+  #tabBar { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; align-items: center; }
+  .tab-btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #ddd; background: #fff; border-radius: 8px; padding: 7px 8px 7px 14px; font-size: 12.5px; cursor: pointer; }
+  .tab-btn.active { background: #6b21d8; color: #fff; border-color: #6b21d8; }
+  .tab-btn.done { border-color: #22a745; color: #22a745; }
+  .tab-btn.active.done { background: #22a745; border-color: #22a745; color: #fff; }
+  .tab-del-btn { border-radius: 50%; padding: 1px 5px; font-size: 10px; opacity: .55; }
+  .tab-del-btn:hover { opacity: 1; background: rgba(0,0,0,.12); }
+  #deleteAllScriptsBtn { font-size: 11px; background: #fdeaea; color: #c0392b; border: 1px solid #f5c6c6; border-radius: 6px; padding: 6px 10px; cursor: pointer; }
+
+  #scriptMeta { font-size: 12px; color: #777; margin-bottom: 10px; line-height: 1.5; }
+  #scriptMeta b { color: #444; }
+  .mark-done-btn { font-size: 11px; background: #eafaf0; color: #22a745; border: 1px solid #b8e6c8; border-radius: 6px; padding: 4px 10px; cursor: pointer; margin-left: 8px; }
+
+  .kw-row { display: flex; gap: 14px; align-items: flex-start; background: #fff; border: 1px solid #eee; border-radius: 10px; padding: 10px; margin-bottom: 10px; }
+  .kw-label { min-width: 170px; max-width: 170px; font-size: 13px; font-weight: 700; color: #6b21d8; padding-top: 6px; word-break: break-word; }
+  .kw-imgs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; flex: 1; }
+  .thumb-wrap { position: relative; border-radius: 8px; overflow: hidden; border: 1px solid #eee; cursor: pointer; background: #fafafa; flex: 0 0 auto; height: 150px; display: flex; align-items: center; justify-content: center; }
+  .thumb-wrap img { height: 150px; width: auto; max-width: 220px; object-fit: contain; display: block; }
+  .thumb-wrap.ppg-saved::after { content: "\2713"; position:absolute; inset:0; background: rgba(34,167,69,.75); color:#fff; display:flex; align-items:center; justify-content:center; font-size:20px; font-weight:700; }
+  .thumb-wrap.ppg-focused { outline: 3px solid #6b21d8; outline-offset: -3px; }
+  .row-loading, .row-empty { font-size: 12px; color: #aaa; padding: 10px; }
+
+  #overlay { position: fixed; inset: 0; background: rgba(0,0,0,.72); display: none; align-items: center; justify-content: center; z-index: 999; }
+  #overlay.show { display: flex; }
+  #overlayBox { background: #fff; border-radius: 12px; padding: 16px; max-width: 90vw; max-height: 90vh; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  #overlayImg { max-width: 80vw; max-height: 70vh; object-fit: contain; border-radius: 8px; }
+  #overlayStatus { font-size: 12px; color: #888; }
+  .overlay-actions { display: flex; gap: 10px; }
+  .overlay-actions button { border: none; border-radius: 8px; padding: 9px 18px; font-size: 13px; cursor: pointer; }
+  #overlaySaveBtn { background: linear-gradient(135deg,#8b3ff5,#6b21d8); color: #fff; }
+  #overlaySaveBtn:disabled { opacity: .6; cursor: default; }
+  #overlayCloseBtn { background: #eee; }
+
+  #badgeManagerPanel { background: #fff; border: 1px solid #eee; border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; }
+  #badgeManagerPanel h2 { font-size: 13px; margin: 0 0 8px; color: #444; }
+  #badgeManager { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+  .badge-chip { display: inline-flex; align-items: center; gap: 6px; background: #f2eafc; color: #6b21d8; border: 1px solid #d9c2f7; border-radius: 999px; padding: 4px 6px 4px 12px; font-size: 12px; }
+  .badge-del-btn { border: none; background: transparent; color: #6b21d8; cursor: pointer; font-size: 12px; line-height: 1; padding: 4px 6px; border-radius: 999px; }
+  .badge-del-btn:hover { background: #e3d0fb; }
+  #deleteAllBadgesBtn { font-size: 11px; background: #fdeaea; color: #c0392b; border: 1px solid #f5c6c6; border-radius: 6px; padding: 5px 10px; cursor: pointer; }
+
+  body { background: var(--ppg-bg); color: var(--ppg-text); }
+  #inputPanel, #timerBar, #badgeManagerPanel { background: var(--ppg-panel); border-color: var(--ppg-border); }
+  #scriptInput { background: var(--ppg-input-bg); border-color: var(--ppg-border-strong); color: var(--ppg-text); }
+  .tab-btn { background: var(--ppg-panel); border-color: var(--ppg-border-strong); color: var(--ppg-text); }
+  .kw-row { background: var(--ppg-panel); border-color: var(--ppg-border); }
+  .kw-label { color: var(--ppg-accent); }
+  .thumb-wrap { background: var(--ppg-input-bg); border-color: var(--ppg-border); }
+  #badgeManagerPanel h2, #scriptMeta b { color: var(--ppg-text); }
+  #overlayBox { background: var(--ppg-panel); }
+  .badge-chip { background: var(--ppg-accent-soft); color: var(--ppg-accent); border-color: var(--ppg-accent-soft-border); }
+  #timerBar button { background: var(--ppg-accent-soft); color: var(--ppg-accent); }
+  .top-bar { display: flex; align-items: center; justify-content: space-between; }
+</style>
+</head>
+<body>
+  <div class="top-bar">
+    <div>
+      <h1>Batch Grid</h1>
+      <div class="sub">Paste every script at once — 10 products each. Every 10 products auto-splits into its own script page.</div>
+    </div>
+    <button class="ppg-theme-btn" title="Toggle theme"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a6.8 6.8 0 0 0 10.5 10.5Z"/></svg></button>
+  </div>
+
+  <div id="inputPanel">
+    <textarea id="scriptInput" placeholder="Paste all your scripts here, one after another..."></textarea>
+    <div class="input-row">
+      <button id="parseBtn">Parse Scripts</button>
+      <span id="parseStatus"></span>
+    </div>
+    <div class="input-row">
+      <label style="font-size:12px; color:#888;">Start from Badge</label>
+      <input type="number" id="badgeStartInput" min="1" style="width:70px; padding:5px 7px; border:1px solid #ddd; border-radius:6px; font-size:12px;">
+      <button id="applyBadgeBtn" style="font-size:11px; background:#f2eafc; color:#6b21d8; border:1px solid #d9c2f7; border-radius:6px; padding:5px 10px; cursor:pointer;">Set</button>
+      <span id="badgeHint" style="font-size:11.5px; color:#999;"></span>
+    </div>
+  </div>
+
+  <div class="sub" style="font-size:11px;">Keyboard: W/A/S/D or Arrow keys to move &middot; Enter to preview, Enter again to save &middot; Esc to close preview.</div>
+
+  <div id="timerBar">
+    <span id="timerDisplay">00:00</span>
+    <button id="timerStartBtn">Start</button>
+    <button id="timerResetBtn">Reset</button>
+    <span>Scripts done: <span id="scriptsDoneCount">0</span></span>
+  </div>
+
+  <div class="ppg-progress-wrap">
+    <div class="ppg-progress-decor">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 10a3 3 0 0 1 .3-6 4.5 4.5 0 0 1 8.6-1A4 4 0 0 1 18 10H6z"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3v10M8 8l4-4 4 4M6 20h12"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M12 12v8"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3v10M8 8l4-4 4 4M6 20h12"/></svg>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 10a3 3 0 0 1 .3-6 4.5 4.5 0 0 1 8.6-1A4 4 0 0 1 18 10H6z"/></svg>
+    </div>
+    <div class="ppg-progress-track">
+      <div class="ppg-progress-fill" id="progressFill"></div>
+      <div class="ppg-progress-truck" id="progressTruck">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 14h11V6H1v8Z"/><path d="M12 9h4l3 3v2h-7V9Z"/><circle cx="5" cy="17" r="2"/><circle cx="16" cy="17" r="2"/></svg>
+      </div>
+    </div>
+    <div class="ppg-progress-label">
+      <span><b id="progressDoneText">0</b> of <span id="progressTotalText">0</span> scripts done</span>
+      <span class="ppg-progress-pct" id="progressPctText">0%</span>
+    </div>
+  </div>
+
+  <div id="badgeManagerPanel">
+    <div class="top-bar">
+      <h2 style="margin:0;">Saved Downloads (by Badge folder)</h2>
+      <button id="summaryBtn" class="ppg-icon-btn" style="font-size:11px; gap:6px; background:var(--ppg-accent-soft); color:var(--ppg-accent); border:1px solid var(--ppg-accent-soft-border); border-radius:6px; padding:5px 10px; cursor:pointer;"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M4 20h16"/></svg>&nbsp;Today's Summary</button>
+    </div>
+    <div id="badgeManager"></div>
+    <button id="deleteAllBadgesBtn">Delete All Downloaded Badges</button>
+  </div>
+
+  <div id="tabBar"></div>
+  <div class="input-row" style="margin-bottom:12px;">
+    <button id="deleteAllScriptsBtn">Delete All Scripts</button>
+  </div>
+  <div id="scriptMeta"></div>
+  <div id="status"></div>
+  <div id="rows"></div>
+
+  <div id="overlay">
+    <div id="overlayBox">
+      <img id="overlayImg" src="">
+      <div id="overlayStatus"></div>
+      <div class="overlay-actions">
+        <button id="overlaySaveBtn">Save HD</button>
+        <button id="overlayCloseBtn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="ppg-fx.js"></script>
+  <script src="grid.js"></script>
+</body>
+</html>

@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "Pinterest Product Pack Grabber",
+  "version": "2.3",
+  "description": "One-click HD image save from Pinterest with auto product-keyword clipboard queue. Each pack gets its own auto-numbered folder, never mixes with old days, and can be manually re-run. Export a numbered, keyword-paired batch for your video tool.",
+  "permissions": ["contextMenus", "downloads", "storage", "tabs", "clipboardWrite"],
+  "host_permissions": ["*://*.pinterest.com/*", "*://*.pinimg.com/*"],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_popup": "popup.html", "default_title": "Product Pack" },
+  "content_scripts": [
+    {
+      "matches": ["*://*.pinterest.com/*"],
+      "js": ["ppg-fx.js", "content.js"],
+      "css": ["content.css", "ppg-fx.css"],
+      "run_at": "document_start"
+    }
+  ]
+}

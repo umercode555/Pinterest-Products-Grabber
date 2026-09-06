@@ -1,0 +1,72 @@
+#ppg-float-btn {
+  position: fixed;
+  top: -100px;
+  left: -100px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  background: linear-gradient(135deg, #8b3ff5, #6b21d8);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  z-index: 2147483647;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.1s ease, transform 0.1s ease, background 0.2s ease;
+}
+
+#ppg-float-btn.ppg-visible {
+  opacity: 0.95;
+  pointer-events: auto;
+}
+
+#ppg-float-btn:hover {
+  transform: scale(1.08);
+  opacity: 1;
+}
+
+#ppg-float-btn.ppg-loading {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+#ppg-float-btn.ppg-loading svg {
+  animation: ppg-spin 0.7s linear infinite;
+}
+
+#ppg-float-btn.ppg-done {
+  background: linear-gradient(135deg, #34c759, #22a745);
+}
+
+@keyframes ppg-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+#ppg-toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: #1a1a1a;
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font: 13px system-ui, sans-serif;
+  z-index: 2147483647;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  max-width: 320px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+#ppg-toast.ppg-toast-show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}

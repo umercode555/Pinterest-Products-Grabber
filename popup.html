@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="ppg-fx.css">
+<style>
+  body { width: 340px; font-family: system-ui, sans-serif; margin: 0; padding: 12px; color: #1a1a1a; }
+  h1 { font-size: 14px; margin: 0 0 8px; }
+  h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #888; margin: 14px 0 6px; }
+  textarea { width: 100%; box-sizing: border-box; font-size: 12px; padding: 6px; border: 1px solid #ddd; border-radius: 6px; resize: vertical; min-height: 54px; font-family: inherit; }
+  .row { display: flex; gap: 6px; margin-top: 6px; }
+  button { font-size: 12px; cursor: pointer; }
+  button.primary { flex: 1; background: linear-gradient(135deg,#8b3ff5,#6b21d8); color: #fff; border: none; border-radius: 6px; padding: 8px; }
+  button.secondary { flex: 1; background: #eee; border: none; border-radius: 6px; padding: 8px; }
+  button.tiny { background: #f2eafc; color: #6b21d8; border: 1px solid #d9c2f7; border-radius: 6px; padding: 4px 8px; font-size: 11px; }
+
+  #queueStatus { margin-top: 10px; padding: 8px; border-radius: 8px; background: #f7f2fd; border: 1px solid #e5d6fa; font-size: 12px; line-height: 1.5; }
+  #queueStatus.empty { color: #999; text-align: center; }
+  #queueStatus .kw { font-weight: 600; color: #6b21d8; }
+  #queueTimer { display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; font-variant-numeric: tabular-nums; font-weight: 700; color: #6b21d8; background: #fff; border: 1px solid #e5d6fa; border-radius: 6px; padding: 2px 7px; }
+
+  .count { font-size: 12px; color: #555; margin-bottom: 6px; }
+  #list { max-height: 170px; overflow-y: auto; border: 1px solid #ddd; border-radius: 6px; margin-bottom: 8px; }
+  .item { display: flex; justify-content: space-between; padding: 5px 8px; font-size: 12px; border-bottom: 1px solid #eee; }
+  .item:last-child { border-bottom: none; }
+  .item span.file { color: #999; margin-right: 6px; }
+
+  #historyList { max-height: 130px; overflow-y: auto; border: 1px solid #ddd; border-radius: 6px; margin-bottom: 6px; }
+  #historyList.empty { display: flex; align-items: center; justify-content: center; padding: 14px; color: #999; font-size: 12px; }
+  .hist-item { display: flex; justify-content: space-between; padding: 5px 8px; font-size: 12px; border-bottom: 1px solid #eee; transform-origin: center; }
+  .hist-item:last-child { border-bottom: none; }
+  .hist-item .hname { font-weight: 600; }
+  .hist-item .hmeta { color: #999; display: flex; align-items: center; gap: 6px; }
+  .hist-folder-btn { cursor: pointer; border: none; background: none; padding: 2px 4px; line-height: 0; border-radius: 4px; opacity: 0.75; color: #555; display: inline-flex; transition: filter .2s ease, opacity .2s ease, transform .2s ease; }
+  .hist-folder-btn:hover { opacity: 1; background: #eee; filter: drop-shadow(0 0 5px var(--ppg-accent-2, #8b3ff5)); transform: scale(1.1); }
+
+  @keyframes ppg-swell {
+    0%   { transform: scale(0.82); opacity: 0; background: #f2eafc; }
+    55%  { transform: scale(1.05); opacity: 1; background: #e9d9fb; }
+    100% { transform: scale(1); opacity: 1; background: transparent; }
+  }
+  .hist-item.ppg-new { animation: ppg-swell 0.6s ease; }
+  #historyTotal.ppg-new { display: inline-block; animation: ppg-swell 0.6s ease; }
+
+  .actions { display: flex; gap: 6px; margin-top: 4px; }
+  .tip { font-size: 11px; color: #888; margin-top: 10px; line-height: 1.4; }
+
+  body { background: var(--ppg-bg); color: var(--ppg-text); }
+  textarea, input[type=number] { background: var(--ppg-input-bg); border-color: var(--ppg-border-strong) !important; color: var(--ppg-text); }
+  #queueStatus { background: var(--ppg-accent-soft); border-color: var(--ppg-accent-soft-border); }
+  #queueTimer { background: var(--ppg-panel); border-color: var(--ppg-accent-soft-border); color: var(--ppg-accent); }
+  #list, #historyList { border-color: var(--ppg-border-strong); }
+  .item, .hist-item { border-color: var(--ppg-border); }
+  button.secondary { background: var(--ppg-hover); color: var(--ppg-text); }
+  button.tiny { background: var(--ppg-accent-soft); color: var(--ppg-accent); border-color: var(--ppg-accent-soft-border); }
+  #queueStatus svg, #queueTimer svg { width: 100%; height: 100%; display: block; }
+</style>
+</head>
+<body>
+  <div class="row" style="justify-content:space-between; align-items:center;">
+    <h1 style="margin:0;">Product Pack Grabber</h1>
+    <div style="display:flex; gap:6px; align-items:center;">
+    <button class="ppg-theme-btn" title="Toggle theme"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a6.8 6.8 0 0 0 10.5 10.5Z"/></svg></button>
+      <button class="tiny" id="openGridBtn">Batch Grid &rarr;</button>
+    </div>
+  </div>
+
+  <h2>Video Script</h2>
+  <textarea id="queueInput" placeholder="Paste the full script here (intro line, 10 products, then the &quot;Also comment...&quot; line). The extension will pull out just the products for the queue and keep the intro/CTA lines for the export." style="min-height:90px;"></textarea>
+  <div class="row">
+    <button class="primary" id="startBtn">Start Queue</button>
+    <button class="secondary" id="clearQueueBtn">Clear</button>
+  </div>
+
+  <div class="row" style="align-items:center; margin-top:8px; gap:8px;">
+    <span style="font-size:11px; color:#888; white-space:nowrap;">Pack #</span>
+    <input type="number" id="packNumInput" min="1" style="width:64px; padding:4px 6px; border:1px solid #ddd; border-radius:6px; font-size:12px;">
+    <button class="tiny" id="applyPackBtn">Use this #</button>
+  </div>
+  <div id="packNumHint" style="font-size:11px; color:#999; margin-top:4px; line-height:1.4;"></div>
+
+  <div id="queueStatus" class="empty">No active queue.</div>
+  <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:#555; margin-top:8px;">
+    <input type="checkbox" id="autoSearchToggle" checked>
+    Auto-search next product after each save
+  </label>
+  <div id="scriptMeta" style="display:none; font-size:11px; color:#888; margin-top:6px; line-height:1.4;"></div>
+  <div class="row" id="queueActions" style="display:none;">
+    <button class="tiny" id="recopyBtn">Re-copy current</button>
+    <button class="tiny" id="skipBtn">Skip →</button>
+  </div>
+
+  <h2>Saved batch</h2>
+  <div class="count" id="count">0 items in this batch</div>
+  <div id="list"></div>
+
+  <div class="actions">
+    <button class="primary" id="finishBtn">Finish Batch</button>
+    <button class="secondary" id="resetBtn">Reset</button>
+  </div>
+
+  <h2>History <span id="historyTotal" style="text-transform:none; color:#6b21d8; font-weight:700;"></span></h2>
+  <div id="historyList"></div>
+  <div class="row" id="historyActions" style="display:none;">
+    <button class="secondary" id="clearHistoryBtn">Clear history</button>
+  </div>
+
+  <div class="tip">
+    Paste your <b>whole script</b> &rarr; <b>Start Queue</b>. The intro line and the "Also comment..." CTA line are set aside automatically (not treated as products) and copies product #1. Paste on Pinterest, search, click the purple &darr; button on the HD image. It downloads full quality, then (if auto-search is on) jumps the tab straight to the next product's search results — just keep clicking the purple button. "Finish Batch" saves manifest.json pairing every file with its keyword, plus INTRO_CAPTION and CTA_CAPTION for your video tool. Each new pack always gets its own folder (auto-numbered) — a stale folder from a previous day is auto-archived instead of mixing in. To redo an incomplete pack, set "Pack #" back to that number and hit "Use this #" before saving again — new images overwrite the old ones cleanly.
+  </div>
+
+  <script src="ppg-fx.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
