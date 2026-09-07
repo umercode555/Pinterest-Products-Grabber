@@ -135,7 +135,11 @@
       <button id="summaryBtn" class="ppg-icon-btn" style="font-size:11px; gap:6px; background:var(--ppg-accent-soft); color:var(--ppg-accent); border:1px solid var(--ppg-accent-soft-border); border-radius:6px; padding:5px 10px; cursor:pointer;"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M4 20h16"/></svg>&nbsp;Today's Summary</button>
     </div>
     <div id="badgeManager"></div>
-    <button id="deleteAllBadgesBtn">Delete All Downloaded Badges</button>
+    <div class="input-row" style="margin-top:6px;">
+      <button id="deleteAllBadgesBtn">Delete All Downloaded Badges</button>
+      <button id="downloadAllScriptsBtn" style="font-size:11px; background:linear-gradient(135deg,#8b3ff5,#6b21d8); color:#fff; border:none; border-radius:6px; padding:6px 12px; cursor:pointer;">Download All Scripts</button>
+      <span id="downloadAllStatus" style="font-size:11.5px; color:#999;"></span>
+    </div>
   </div>
 
   <div id="tabBar"></div>
@@ -158,6 +162,7 @@
   </div>
 
   <script src="ppg-fx.js"></script>
+  <script src="jszip.min.js"></script>
   <script src="grid.js"></script>
 </body>
 </html>

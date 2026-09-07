@@ -48,7 +48,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
   if (msg && msg.type === "DOWNLOAD_TO_BADGE" && msg.src && msg.badgeFolder) {
-    handleBadgeDownload(msg.src, msg.keyword, msg.badgeFolder).then(sendResponse);
+    handleBadgeDownload(msg.src, msg.keyword, msg.badgeFolder, msg.intro, msg.cta, msg.totalExpected).then(sendResponse);
+    return true;
+  }
+  if (msg && msg.type === "WRITE_BADGE_MANIFEST" && msg.badgeFolder) {
+    writeBadgeManifest(msg.badgeFolder, msg.intro, msg.cta).then(sendResponse);
     return true;
   }
   if (msg && msg.type === "DELETE_BADGE" && msg.badgeFolder) {
@@ -301,7 +305,57 @@ async function fetchGridBatch(keywords, limit) {
 
 // ---------- Batch Grid: per-Badge downloads (independent of the Pack/queue
 // system used by the popup) ----------
-async function handleBadgeDownload(rawSrc, keyword, badgeFolder) {
+// Pulls intro/cta straight from the persisted Batch Grid session
+// (ppgGridState.scripts) by matching the badge number in the folder name.
+// This is the source of truth — it doesn't depend on the grid.html tab
+// having the latest code loaded/refreshed, so captions can't silently come
+// through empty just because the page's in-memory state was stale.
+async function getScriptMetaForBadge(badgeFolder) {
+  const numMatch = /(\d+)/.exec(badgeFolder || "");
+  if (!numMatch) return null;
+  const badgeNum = parseInt(numMatch[1], 10);
+
+  const store = await chrome.storage.local.get(["ppgBadgeCaptions", "ppgGridState", "gridBatches"]);
+
+  // 1. Durable per-badge caption store — the real source of truth going
+  //    forward, written the moment a script's badge is assigned.
+  const durable = store.ppgBadgeCaptions || {};
+  if (durable[badgeNum]) return { intro: durable[badgeNum].intro || "", cta: durable[badgeNum].cta || "" };
+
+  // 2. Currently-loaded session's scripts, matched by badge number.
+  const state = store.ppgGridState;
+  if (state && Array.isArray(state.scripts)) {
+    const match = state.scripts.find((s) => s.badge === badgeNum);
+    if (match) return { intro: match.intro || "", cta: match.cta || "" };
+  }
+
+  // 3. Keyword-overlap fallback (not exact-set) — recovers orphaned badges
+  //    whose saved image count isn't exactly 10 (a "no images found"
+  //    keyword, or a duplicate save), which an exact-set comparison would
+  //    always miss.
+  if (state && Array.isArray(state.scripts) && store.gridBatches && store.gridBatches[badgeFolder]) {
+    const savedKeywordSet = new Set(store.gridBatches[badgeFolder].map((i) => i.keyword.trim().toLowerCase()));
+    let best = null;
+    let bestScore = 0;
+    state.scripts.forEach((s) => {
+      const prodSet = new Set((s.products || []).map((k) => k.trim().toLowerCase()));
+      let overlap = 0;
+      savedKeywordSet.forEach((k) => {
+        if (prodSet.has(k)) overlap++;
+      });
+      if (overlap > bestScore) {
+        bestScore = overlap;
+        best = s;
+      }
+    });
+    const needed = Math.max(6, Math.ceil(savedKeywordSet.size * 0.6));
+    if (best && bestScore >= needed) return { intro: best.intro || "", cta: best.cta || "" };
+  }
+
+  return null;
+}
+
+async function handleBadgeDownload(rawSrc, keyword, badgeFolder, intro, cta, totalExpected) {
   const hdUrl = await resolveHDUrl(rawSrc);
   if (!hdUrl) {
     return { ok: false, error: "no-hd", filename: null };
@@ -332,7 +386,71 @@ async function handleBadgeDownload(rawSrc, keyword, badgeFolder) {
 
   const milestone = await bumpTotalImagesAndCheckMilestone();
 
+  // Permanent fix: once this badge's image count reaches the script's full
+  // product count, auto-write manifest.json into the same folder — so a
+  // Batch Grid download always ends up looking exactly like a normal
+  // Pinterest-extension pack (images + manifest.json), no manual step
+  // needed. Also re-fires (overwrite) if more images get added later.
+  if (totalExpected && list.length >= totalExpected) {
+    const stored = await getScriptMetaForBadge(badgeFolder);
+    const finalIntro = (stored && stored.intro) || intro || "";
+    const finalCta = (stored && stored.cta) || cta || "";
+    await writeBadgeManifest(badgeFolder, finalIntro, finalCta, list);
+  }
+
   return { ok: true, downloadedKeyword: keyword, filename, folder: badgeFolder, milestone };
+}
+
+// Writes/overwrites manifest.json for one badge folder, in the exact shape
+// the main extension already produces (count / INTRO_CAPTION / items /
+// CTA_CAPTION) so the Video Tool Processor needs no changes. `list` can be
+// passed in directly (avoids a redundant storage read); otherwise it's
+// pulled fresh from gridBatches.
+async function writeBadgeManifest(badgeFolder, intro, cta, list) {
+  if (!list) {
+    const store = await chrome.storage.local.get(["gridBatches"]);
+    list = (store.gridBatches || {})[badgeFolder] || [];
+  }
+  if (!list.length) return { ok: false, error: "no-images" };
+
+  // Prefer the persisted session's captions over whatever the caller passed
+  // in — covers the case a page called this with a stale/empty intro/cta.
+  const stored = await getScriptMetaForBadge(badgeFolder);
+  const finalIntro = (stored && stored.intro) || intro || "";
+  const finalCta = (stored && stored.cta) || cta || "";
+
+  // Can't silently ship a manifest with missing captions — drop a visible
+  // flag file right next to it so it's impossible to miss in Finder.
+  if (!finalIntro && !finalCta) {
+    const warnUrl =
+      "data:text/plain;charset=utf-8," +
+      encodeURIComponent(
+        `Could not automatically recover the intro/CTA captions for ${badgeFolder}.\n` +
+        `manifest.json was still written with the correct images, but INTRO_CAPTION and CTA_CAPTION are blank.\n` +
+        `Fill them in manually, or re-run "Download All Scripts" after re-pasting this script.`
+      );
+    chrome.downloads.download({
+      url: warnUrl,
+      filename: badgeFolder + "/CAPTIONS_MISSING.txt",
+      saveAs: false,
+      conflictAction: "overwrite"
+    });
+  }
+
+  const manifest = {
+    count: list.length,
+    INTRO_CAPTION: finalIntro,
+    items: list.map((i) => ({ file: i.file, keyword: i.keyword, url: i.url })),
+    CTA_CAPTION: finalCta
+  };
+  const url = "data:application/json;charset=utf-8," + encodeURIComponent(JSON.stringify(manifest, null, 2));
+  await new Promise((resolve) => {
+    chrome.downloads.download(
+      { url, filename: badgeFolder + "/manifest.json", saveAs: false, conflictAction: "overwrite" },
+      (id) => resolve(id)
+    );
+  });
+  return { ok: true };
 }
 
 // ---------- Batch Grid: badge management (delete one / delete all) ----------
